@@ -1,0 +1,101 @@
+version: "3.5"
+services:
+  ldap:
+    image: andynozy/me/aaa/openldap
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    environment:
+      LDAP_HOST:           "ldap"
+      LDAP_BASEDN:         "dc=ienlab,dc=andynozy,dc=com"
+      LDAP_ADMIN_USER:     "admin"
+      LDAP_ADMIN_PASSWORD: "P@sscode123"
+    logging:
+      driver: "json-file"
+      options:
+        max-file: 5
+        max-size: 10m
+    networks:
+      - net
+    ports:
+      - target: 389
+        published: 389
+        protocol: tcp
+        mode: host
+    volumes:
+      - "/opt/docker/aaa/ldap/config:/etc/openldap/slapd.d"
+      - "/opt/docker/aaa/ldap/data:/var/lib/openldap/openldap-data"
+  phpldapadmin:
+    image: andynozy/me/aaa/phpldapadmin
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    depends_on:
+      - ldap
+    environment:
+      LDAP_HOST:           "ldap"
+    logging:
+      driver: "json-file"
+      options:
+        max-file: 5
+        max-size: 10m
+    networks:
+      - net
+    ports:
+      - "80:8080/tcp"
+  tacplus:
+    image: andynozy/me/aaa/tacplus
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    depends_on:
+      - ldap
+    logging:
+      driver: "json-file"
+      options:
+        max-file: 5
+        max-size: 10m
+    networks:
+      - net
+    ports:
+      - target: 49
+        published: 49
+        protocol: tcp
+        mode: host
+    tty: true
+    volumes:
+      - "/opt/docker/aaa/tacplus/tac_plus.cfg:/tacacs/etc/tac_plus.cfg"
+  radius:
+    image: andynozy/me/aaa/freeradius
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    depends_on:
+      - ldap
+    environment:
+      LDAP_HOST:           "ldap"
+      LDAP_BASEDN:         "dc=ienlab,dc=andynozy,dc=com"
+      LDAP_ADMIN_USER:     "admin"
+      LDAP_ADMIN_PASSWORD: "P@sscode123"
+      LDAP_ADMIN_FULLDN:   "cn=admin,dc=ienlab,dc=andynozy,dc=com"
+    logging:
+      driver: "json-file"
+      options:
+        max-file: 5
+        max-size: 10m
+    networks:
+      - net
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+    volumes:
+      - "/opt/docker/aaa/radius/users:/etc/raddb/mods-config/files/authorize"
+      - "/opt/docker/aaa/radius/huntgroups:/etc/raddb/mods-config/preprocess/hu                                                ntgroups"
+      - "/opt/docker/aaa/radius/clients.conf:/etc/raddb/clients.conf"
+
+networks:
+  net:
